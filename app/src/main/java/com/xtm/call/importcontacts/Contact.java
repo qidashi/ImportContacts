@@ -6,7 +6,7 @@ package com.xtm.call.importcontacts;
  */
 
 public class Contact {
-    boolean isCheck = true;
+    public boolean isCheck = true;
     String name;
     String phone1;
     String phone2;
@@ -70,10 +70,6 @@ public class Contact {
 
     @Override
     public String toString() {
-        return "Contact{" +
-                "name='" + name + '\'' +
-                ", phone1='" + phone1 + '\'' +
-                ", phone2='" + phone2 + '\'' +
-                '}';
+        return  "     "+name + " <--> " + phone1 ;
     }
 }

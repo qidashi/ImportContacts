@@ -1,14 +1,9 @@
 package com.xtm.call.importcontacts;
 
-import android.app.Activity;
-import android.content.ActivityNotFoundException;
 import android.content.ContentProviderOperation;
 import android.content.ContentProviderResult;
-import android.content.Intent;
 import android.content.OperationApplicationException;
-import android.net.Uri;
 import android.os.Bundle;
-import android.os.Environment;
 import android.os.RemoteException;
 import android.provider.ContactsContract;
 import android.support.v7.app.AppCompatActivity;
@@ -23,17 +18,14 @@ import android.widget.Toast;
 import java.io.File;
 import java.util.ArrayList;
 import java.util.List;
-//Ctrl + F12 :查看类方法层级
-//Ctrl + Alt + H :查看调用位置
-public class MainActivity extends AppCompatActivity {
 
-    private static final int FILE_SELECT_CODE = 1;
+public class MainActivity extends AppCompatActivity {
     private static final String TAG = MainActivity.class.getSimpleName();
     private TextView tvFilePath;
     private ListView lvContact;
     private List<Contact> contacts;
     private LinearLayout progressbar;
-    private Intent intent;
+    private List<Contact> csv_contacts;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -42,27 +34,24 @@ public class MainActivity extends AppCompatActivity {
         initView();
     }
 
+    // 自定义文件选择器选择文件按钮
     public void chooseFile(View view) {
-        chooseContactsFile();
+        FilePickerDialog filePickerDialog = new FilePickerDialog(this);
+        filePickerDialog.setOnFileSelectListener(new FilePickerDialog.OnFileSelectListener() {
+            @Override
+            public void onFileSelect(File file) {
+                if (file != null && file.exists()) {
+                    showImportContacts(file);
+                } else {
+                    Toast.makeText(MainActivity.this, "文件无效！", Toast.LENGTH_SHORT).show();
+                }
+            }
+        });
+        filePickerDialog.show();
     }
+    // 导入到通讯录按钮
     public void importContacts(View view) {
-        showSelectedContactsList();
-
-    }
-
-    /**
-     * 選擇聯繫人文件
-     */
-    private void chooseContactsFile() {
-        intent = new Intent(Intent.ACTION_GET_CONTENT);
-        intent.setType("*/*");
-        intent.addCategory(Intent.CATEGORY_OPENABLE);
-        try {
-            startActivityForResult(Intent.createChooser(intent, "选择文件"), FILE_SELECT_CODE);
-        } catch (ActivityNotFoundException ex) {
-            Toast.makeText(this, "没有发现文件管理器啊-_-!!", Toast.LENGTH_SHORT).show();
-
-        }
+        setUpImportContacts();
     }
 
     private void initView() {
@@ -71,60 +60,12 @@ public class MainActivity extends AppCompatActivity {
         progressbar =  findViewById(R.id.progressbar);
     }
 
-
-    @Override
-    protected void onActivityResult(int requestCode, int resultCode, Intent data) {
-        super.onActivityResult(requestCode, resultCode, data);
-        if (resultCode != Activity.RESULT_OK) {
-            Log.e(TAG, "onActivityResult() error, resultCode: " + resultCode);
-            tvFilePath.setText("onActivityResult() error, resultCode: " + resultCode);
-            super.onActivityResult(requestCode, resultCode, data);
-            return;
-        }
-        if (requestCode == FILE_SELECT_CODE) {
-            Uri uri = data.getData();
-            if (null != uri) {
-                String path = uri.getPath();
-                String realPath = null;
-                if (path.contains(":")) {
-                    String[] split = path.split(":");
-                    realPath = Environment.getExternalStorageDirectory() + "/" + split[1];
-                }
-                if (realPath.endsWith(".csv")) {
-                    showProcess();
-                    tvFilePath.setText("" + realPath);
-                    File file = new File(realPath);
-                    Toast.makeText(this, "" + file.exists(), Toast.LENGTH_SHORT).show();
-                    List<Contact> csv_contacts = ReadExcelUtils.parseContactsByCsv(file);
-                    if (BuildConfig.DEBUG) Log.d(TAG, "contacts:" + csv_contacts);
-                    showContacts(csv_contacts);
-                    hideProcess();
-                } else if (realPath.endsWith(".xlsx")) {
-                    showProcess();
-                    tvFilePath.setText("" + realPath);
-                    File file = new File(realPath);
-                    Toast.makeText(this, "" + file.exists(), Toast.LENGTH_SHORT).show();
-                    List<Contact> xlsx_contacts = ReadExcelUtils.parseContactsByXlsx(file);
-                    if (BuildConfig.DEBUG) Log.d(TAG, "contacts:" + xlsx_contacts);
-                    showContacts(xlsx_contacts);
-                    hideProcess();
-                } else {
-                    Toast.makeText(this, "请导入‘.csv’或‘xlsx’文件！", Toast.LENGTH_SHORT).show();
-                }
-
-            } else {
-                Toast.makeText(this, "数据为空", Toast.LENGTH_SHORT).show();
-            }
-        }
-
-    }
-
     private void hideProcess() {
-//        progressbar.setVisibility(View.GONE);
+        progressbar.setVisibility(View.GONE);
     }
 
     private void showProcess() {
-//        progressbar.setVisibility(View.VISIBLE);
+        progressbar.setVisibility(View.VISIBLE);
     }
 
     private void showContacts(List<Contact> contacts) {
@@ -139,9 +80,7 @@ public class MainActivity extends AppCompatActivity {
 
     }
 
-
-
-    private void showSelectedContactsList() {
+    private void setUpImportContacts() {
         ContactAdapter adapter = (ContactAdapter) lvContact.getAdapter();
         if (null != adapter) {
             contacts = adapter.getSelectContacts();
@@ -157,13 +96,12 @@ public class MainActivity extends AppCompatActivity {
             }
             if (BuildConfig.DEBUG) Log.d(TAG, "contacts:" + contacts);
         } else {
-            Toast.makeText(this, "适配器为null", Toast.LENGTH_SHORT).show();
+            Toast.makeText(this, "导入失败！", Toast.LENGTH_SHORT).show();
         }
     }
 
     /**
      * 批量添加联系人
-     *
      * @param lists
      * @throws OperationApplicationException
      * @throws RemoteException
@@ -214,6 +152,27 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
+    private void showImportContacts(File file) {
+        String realPath = file.getAbsolutePath();
+        if (realPath.endsWith(".csv")) {
+            showProcess();
+            tvFilePath.setText("" + realPath);
+            String fileEncode= CharSetUtils.detect(realPath);
+            csv_contacts = ExcelUtils.parseContactsByCsv(file,fileEncode);
+            showContacts(csv_contacts);
+            hideProcess();
+        } else if(realPath.endsWith(".xlsx")) {
+            showProcess();
+            tvFilePath.setText("" + realPath);
+            File file1 = new File(realPath);
+            List<Contact> xlsx_contacts = ExcelUtils.parseContactsByXlsx(file1);
+            if (BuildConfig.DEBUG) Log.d(TAG, "contacts:" + xlsx_contacts);
+            showContacts(xlsx_contacts);
+            hideProcess();
+        }else {
+            Toast.makeText(this, "请导入‘csv’或'xlsx'文件！", Toast.LENGTH_SHORT).show();
+        }
 
 
+    }
 }

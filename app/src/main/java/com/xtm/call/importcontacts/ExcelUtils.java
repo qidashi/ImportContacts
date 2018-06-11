@@ -1,5 +1,7 @@
 package com.xtm.call.importcontacts;
 
+import android.text.TextUtils;
+
 import org.apache.poi.ss.usermodel.Cell;
 import org.apache.poi.ss.usermodel.CellValue;
 import org.apache.poi.ss.usermodel.FormulaEvaluator;
@@ -13,15 +15,17 @@ import java.io.FileInputStream;
 import java.io.FileReader;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.InputStreamReader;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.regex.Pattern;
 
 /**
  * Function:
  * Created by TianMing.Xiong on 18-5-25.
  */
 
-public class ReadExcelUtils {
+public class ExcelUtils {
     /**
      * 解析csv文件获取联系人信息
      * @param file
@@ -84,7 +88,7 @@ public class ReadExcelUtils {
 //                for (int c = 0; c<cellsCount; c++) {
 //                    String value = getCellAsString(row, c, formulaEvaluator);
 //                    String cellInfo = "r:"+r+"; c:"+c+"; v:"+value;
-//                    if (BuildConfig.DEBUG) Log.d("ReadExcelUtils", cellInfo);
+//                    if (BuildConfig.DEBUG) Log.d("ExcelUtils", cellInfo);
 
 //                }
             }
@@ -129,8 +133,61 @@ public class ReadExcelUtils {
         return value;
     }
 
-//    HAHAH
+    /**
+     * 解析csv文件获取联系人信息
+     * @param file
+     * @param fileEncode
+     * @return
+     */
+    public static List<Contact> parseContactsByCsv(File file, String fileEncode) {
+        if(null==file) return null ;
+        try {
+            ArrayList<Contact> contacts = new ArrayList<>();
+            InputStreamReader isr = new InputStreamReader(new FileInputStream(file), fileEncode);
+//            FileReader fileReader = new FileReader(file);
+            BufferedReader bufferedReader = new BufferedReader(isr);
+            Contact contact ;
+            StringBuilder sbName = new StringBuilder();
+            StringBuilder sbPhone1 = new StringBuilder();
+            StringBuilder sbPhone2 = new StringBuilder();
+            String line ;
+            while ((line = bufferedReader.readLine())!=null){
+                String[] split = line.split(",");
+                sbName.setLength(0);
+                sbPhone1.setLength(0);
+                sbPhone2.setLength(0);
 
+                if(split.length<2 || TextUtils.isEmpty(split[0])
+                        || TextUtils.isEmpty(split[1])
+                        || !isNumeric(split[1])
+                        ){
+                    continue;
+                }else if(split.length==2){//一个号码
+                    sbName.append(split[0]);
+                    sbPhone1.append(split[1]);
+                }else {//两个号码
+                    sbName.append(split[0]);
+                    sbPhone1.append(split[1]);
+                    sbPhone2.append(split[2]);
+                }
+
+                contact = new Contact(sbName.toString(), sbPhone1.toString(), sbPhone2.toString());
+                contacts.add(contact);
+
+            }
+            bufferedReader.close();
+            return contacts;
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+        return null;
+    }
+
+
+    public static boolean isNumeric(String str){
+        Pattern pattern = Pattern.compile("[0-9]*");
+        return pattern.matcher(str).matches();
+    }
 
 
 }
